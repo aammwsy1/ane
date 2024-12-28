@@ -1,1 +1,243 @@
-# ane
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محول العملات</title>
+    <style>
+        body {
+            font-family: "Arial", sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #0984e3, #74b9ff);
+            color: #ffffff;
+            margin: 0;
+        }
+        .language-switch {
+            height: 35px;
+            width: 40px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .converter {
+            background-color: #ffffff;
+            border-radius: 15px;
+            padding: 30px;
+            display: inline-block;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            margin: auto;
+            text-align: left;
+            color: #2d3436;
+        }
+        select, input, button {
+            margin: 15px 0;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #dfe6e9;
+            border-radius: 8px;
+            width: 100%;
+        }
+        button {
+            background-color: #0984e3;
+            color: #ffffff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #74b9ff;
+        }
+        h1, p {
+            margin: 0 0 20px;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #2d3436;
+            font-weight: bold;
+        }
+        .error {
+            color: #d63031;
+            font-weight: bold;
+        }
+        .timestamp {
+            font-size: 14px;
+            color: #636e72;
+            margin-top: 15px;
+            text-align: center;
+        }
+        .currency-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+        }
+        .currency-container select {
+            width: 45%;
+        }
+        .swap-button {
+            margin: 15px auto;
+            display: block;
+            background-color: #636e72;
+        }
+    </style>
+</head>
+<body>
+    <button class="language-switch" onclick="switchLanguage()">EN</button>
+    <h1 id="title">محول العملات</h1>
+
+    <div class="converter">
+        <p id="amount-label">أدخل المبلغ:</p>
+        <input type="text" id="amount" placeholder="المبلغ" oninput="validateInput(); convertCurrency()" pattern="[0-9٠-٩]+">
+
+        <div class="currency-container">
+            <div>
+                <p id="to-label">اختر العملة المراد التحويل إليها:</p>
+                <select id="toCurrency" onchange="convertCurrency()"></select>
+            </div>
+            <div>
+                <p id="from-label">اختر العملة المراد التحويل منها:</p>
+                <select id="fromCurrency" onchange="convertCurrency()"></select>
+            </div>
+        </div>
+
+        <button class="swap-button" onclick="swapCurrencies()">تبديل العملات</button>
+
+        <p id="result"></p>
+        <p class="timestamp" id="timestamp"></p>
+    </div>
+
+    <script>
+        const apiURL = "https://api.exchangerate-api.com/v4/latest/USD";
+        let currentLanguage = "ar";
+
+        const currencyNames = {
+            "ar": {
+                "USD": "الدولار الأمريكي",
+                "EUR": "اليورو",
+                "JPY": "الين الياباني",
+                "GBP": "الجنيه الاسترليني",
+                "AUD": "الدولار الأسترالي",
+                "CAD": "الدولار الكندي",
+                "SAR": "الريال السعودي",
+                "AED": "الدرهم الإماراتي",
+                "EGP": "الجنيه المصري",
+                "KRW": "الوون الكوري الجنوبي"
+            },
+            "en": {
+                "USD": "US Dollar",
+                "EUR": "Euro",
+                "JPY": "Japanese Yen",
+                "GBP": "British Pound",
+                "AUD": "Australian Dollar",
+                "CAD": "Canadian Dollar",
+                "SAR": "Saudi Riyal",
+                "AED": "UAE Dirham",
+                "EGP": "Egyptian Pound",
+                "KRW": "South Korean Won"
+            }
+        };
+
+        function switchLanguage() {
+            currentLanguage = currentLanguage === "ar" ? "en" : "ar";
+            document.documentElement.lang = currentLanguage;
+            document.querySelector(".language-switch").textContent = currentLanguage === "ar" ? "EN" : "AR";
+            updateLanguage();
+        }
+
+        function updateLanguage() {
+            document.getElementById("title").textContent = currentLanguage === "ar" ? "محول العملات" : "Currency Converter";
+            document.getElementById("amount-label").textContent = currentLanguage === "ar" ? "أدخل المبلغ:" : "Enter amount:";
+            document.getElementById("to-label").textContent = currentLanguage === "ar" ? "اختر العملة المراد التحويل إليها:" : "Select currency to convert to:";
+            document.getElementById("from-label").textContent = currentLanguage === "ar" ? "اختر العملة المراد التحويل منها:" : "Select currency to convert from:";
+            updateCurrencyOptions();
+        }
+
+        function updateCurrencyOptions() {
+            const fromCurrency = document.getElementById("fromCurrency");
+            const toCurrency = document.getElementById("toCurrency");
+
+            const currencies = Object.keys(currencyNames[currentLanguage]);
+            fromCurrency.innerHTML = "";
+            toCurrency.innerHTML = "";
+
+            currencies.forEach(currency => {
+                const optionFrom = document.createElement("option");
+                optionFrom.value = currency;
+                optionFrom.textContent = currencyNames[currentLanguage][currency];
+                fromCurrency.appendChild(optionFrom);
+
+                const optionTo = document.createElement("option");
+                optionTo.value = currency;
+                optionTo.textContent = currencyNames[currentLanguage][currency];
+                toCurrency.appendChild(optionTo);
+            });
+        }
+
+        async function updateCurrencies() {
+            try {
+                const response = await fetch(apiURL);
+                const data = await response.json();
+                updateCurrencyOptions();
+            } catch (error) {
+                alert(currentLanguage === "ar" ? "حدث خطأ أثناء تحميل بيانات العملات. يرجى المحاولة لاحقًا." : "An error occurred while loading currency data. Please try again later.");
+            }
+        }
+
+        function validateInput() {
+            const amountInput = document.getElementById('amount').value;
+            const arabicDigits = /[٠-٩]/g;
+            const englishDigits = /[0-9]/g;
+            if (amountInput && !amountInput.match(arabicDigits) && !amountInput.match(englishDigits)) {
+                document.getElementById('result').innerHTML = `<span class="error">${currentLanguage === "ar" ? "يرجى إدخال أرقام فقط!" : "Please enter numbers only!"}</span>`;
+                return false;
+            } else {
+                document.getElementById('result').innerHTML = "";
+                return true;
+            }
+        }
+
+        async function convertCurrency() {
+            if (!validateInput()) return;
+
+            const amountInput = document.getElementById('amount').value;
+            const amount = parseFloat(amountInput.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+            const from = document.getElementById('fromCurrency').value;
+            const to = document.getElementById('toCurrency').value;
+
+            if (!from || !to) {
+                document.getElementById('result').innerHTML = `<span class="error">${currentLanguage === "ar" ? "يرجى اختيار العملات للتحويل!" : "Please select currencies to convert!"}</span>`;
+                return;
+            }
+
+            if (!amountInput) {
+                document.getElementById('result').innerHTML = "";
+                return;
+            }
+
+            try {
+                const response = await fetch(apiURL);
+                const data = await response.json();
+                const rate = data.rates[to] / data.rates[from];
+                const convertedAmount = (amount * rate).toFixed(2);
+                document.getElementById('result').innerHTML = `${amount} ${currencyNames[currentLanguage][from]}<br>${convertedAmount} ${currencyNames[currentLanguage][to]}`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<span class="error">${currentLanguage === "ar" ? "خطأ أثناء التحويل!" : "Error during conversion!"}</span>`;
+            }
+        }
+
+        function swapCurrencies() {
+            const fromCurrency = document.getElementById("fromCurrency");
+            const toCurrency = document.getElementById("toCurrency");
+            const temp = fromCurrency.value;
+            fromCurrency.value = toCurrency.value;
+            toCurrency.value = temp;
+            convertCurrency();
+        }
+
+        updateCurrencies();
+    </script>
+</body>
+</html>
+
